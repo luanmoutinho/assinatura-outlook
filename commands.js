@@ -1,10 +1,45 @@
 Office.onReady(() => {});
 
+const msalConfig = {
+  auth: {
+    clientId: "c4232071-8cb2-4038-a318-8b82a1118dd5",
+    authority: "https://login.microsoftonline.com/common",
+    redirectUri: "https://luanmoutinho.github.io/assinatura-outlook/commands.html"
+  },
+  cache: {
+    cacheLocation: "localStorage"
+  }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
 async function inserirAssinatura(event) {
   try {
     const usuario = await obterDadosUsuario();
 
-    let assinaturaHTML = `
+    const nome = usuario.displayName || "";
+    const cargo = usuario.jobTitle || "";
+    const telefone = (usuario.businessPhones && usuario.businessPhones[0]) || usuario.mobilePhone || "";
+    const email = usuario.mail || usuario.userPrincipalName || "";
+    const endereco = usuario.streetAddress || "";
+
+    const linhaCargo = cargo
+      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:14px;font-weight:900;color:#706e6e;">${cargo}</td></tr>`
+      : "";
+
+    const linhaTelefone = telefone
+      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-telefone.png" width="14" style="vertical-align:middle;" alt=""><span style="color:#706e6e;margin-left:5px;">${telefone}</span></td></tr>`
+      : "";
+
+    const linhaEmail = email
+      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-email.png" width="14" style="vertical-align:middle;" alt=""><a href="mailto:${email}" style="color:#706e6e;text-decoration:none;margin-left:5px;">${email}</a></td></tr>`
+      : "";
+
+    const linhaEndereco = endereco
+      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-local.png" width="14" style="vertical-align:middle;" alt=""><span style="color:#706e6e;margin-left:5px;">${endereco}</span></td></tr>`
+      : "";
+
+    const assinaturaHTML = `
 <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;table-layout:fixed;background-color:transparent;">
   <tr>
     <td valign="top" width="540" style="background-color:transparent;padding:0;">
@@ -34,32 +69,13 @@ async function inserirAssinatura(event) {
             <table>
               <tr>
                 <td style="font-family:Arial,sans-serif;font-size:18px;font-weight:900;color:#706e6e;text-transform:uppercase;line-height:1.2;">
-                  %%DisplayName%%
+                  ${nome}
                 </td>
               </tr>
-              <tr>
-                <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:14px;font-weight:900;color:#706e6e;">
-                  %%Title%%
-                </td>
-              </tr>
-              <tr>
-                <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;">
-                  <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-telefone.png" width="14" style="vertical-align:middle;" alt="">
-                  <span style="color:#706e6e;margin-left:5px;">%%Phone%%</span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;">
-                  <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-email.png" width="14" style="vertical-align:middle;" alt="">
-                  <a href="mailto:%%Email%%" style="color:#706e6e;text-decoration:none;margin-left:5px;">%%Email%%</a>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;">
-                  <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-local.png" width="14" style="vertical-align:middle;" alt="">
-                  <span style="color:#706e6e;margin-left:5px;">%%Street%%</span>
-                </td>
-              </tr>
+              ${linhaCargo}
+              ${linhaTelefone}
+              ${linhaEmail}
+              ${linhaEndereco}
               <tr>
                 <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;">
                   <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-link.png" width="14" style="vertical-align:middle;" alt="">
@@ -85,20 +101,6 @@ async function inserirAssinatura(event) {
 </table>
 `;
 
-    // Mapeamento ajustado exatamente para os placeholders do seu HTML
-    const mapaPlaceholders = {
-      "%%DisplayName%%": usuario.displayName || "",
-      "%%Title%%": usuario.jobTitle || "",
-      "%%Phone%%": (usuario.businessPhones && usuario.businessPhones[0]) || usuario.mobilePhone || "",
-      "%%Email%%": usuario.mail || usuario.userPrincipalName || "",
-      "%%Street%%": usuario.streetAddress || ""
-    };
-
-    for (const [chave, valor] of Object.entries(mapaPlaceholders)) {
-      const regex = new RegExp(chave, "gi");
-      assinaturaHTML = assinaturaHTML.replace(regex, valor);
-    }
-
     Office.context.mailbox.item.body.setSignatureAsync(
       assinaturaHTML,
       { coercionType: Office.CoercionType.Html },
@@ -115,12 +117,9 @@ async function inserirAssinatura(event) {
   }
 }
 
-/**
- * Busca os dados do usuário no Microsoft Graph usando SSO e salva em cache por 4 horas
- */
 async function obterDadosUsuario() {
-  const CHAVE_CACHE = "assinatura_gep_perfil_cache";
-  const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000; // 4 horas
+  const CHAVE_CACHE = "assinatura_gep_perfil_v2";
+  const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
     const cacheSalvo = localStorage.getItem(CHAVE_CACHE);
@@ -131,18 +130,27 @@ async function obterDadosUsuario() {
       }
     }
 
-    // Solicita token silencioso do Office SSO
-    const token = await Office.auth.getAccessToken({
-      allowSignInPrompt: false,
-      allowConsentPrompt: false,
-      forMSGraphAccess: true
-    });
+    const emailLogado = Office.context.mailbox.userProfile.emailAddress;
+    const tokenRequest = {
+      scopes: ["User.Read"],
+      loginHint: emailLogado
+    };
 
-    // Consulta o Microsoft Graph pedindo explicitamente o streetAddress
+    let authResult;
+    const contas = msalInstance.getAllAccounts();
+    if (contas.length > 0) {
+      authResult = await msalInstance.acquireTokenSilent({
+        ...tokenRequest,
+        account: contas[0]
+      });
+    } else {
+      authResult = await msalInstance.ssoSilent(tokenRequest);
+    }
+
     const campos = "displayName,jobTitle,businessPhones,mobilePhone,mail,userPrincipalName,streetAddress";
     const resposta = await fetch(`https://graph.microsoft.com/v1.0/me?$select=${campos}`, {
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${authResult.accessToken}`
       }
     });
 
@@ -162,8 +170,7 @@ async function obterDadosUsuario() {
 
     return perfil;
   } catch (erro) {
-    console.warn("Não foi possível obter dados do Graph, usando fallback local:", erro);
-    // Fallback com dados básicos do perfil logado no Outlook caso o Graph falhe
+    console.warn("Fallback local ativado:", erro);
     const perfilOutlook = Office.context.mailbox.userProfile;
     return {
       displayName: perfilOutlook.displayName || "",
@@ -176,5 +183,4 @@ async function obterDadosUsuario() {
   }
 }
 
-// Registra a função para o evento OnNewMessageCompose do manifest.xml
 Office.actions.associate("inserirAssinatura", inserirAssinatura);
