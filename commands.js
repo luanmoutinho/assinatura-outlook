@@ -3,7 +3,7 @@ Office.onReady(() => {});
 const msalConfig = {
   auth: {
     clientId: "c4232071-8cb2-4038-a318-8b82a1118dd5",
-    authority: "https://login.microsoftonline.com/common",
+    authority: "https://login.microsoftonline.com/engenhariaep.com.br",
     redirectUri: "https://luanmoutinho.github.io/assinatura-outlook/commands.html"
   },
   cache: {
