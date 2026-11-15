@@ -11,7 +11,12 @@ const msalConfig = {
   }
 };
 
-const msalInstance = new msal.PublicClientApplication(msalConfig);
+let msalInstance = null;
+if (typeof msal !== "undefined") {
+  msalInstance = new msal.PublicClientApplication(msalConfig);
+}
+
+let cacheMemoria = null;
 
 async function inserirAssinatura(event) {
   try {
@@ -101,8 +106,10 @@ async function inserirAssinatura(event) {
 </table>
 `;
 
-    Office.context.mailbox.item.body.setSignatureAsync(
-      assinaturaHTML,
+    const corpoComAssinatura = `<br><br>${assinaturaHTML}`;
+
+    Office.context.mailbox.item.body.setAsync(
+      corpoComAssinatura,
       { coercionType: Office.CoercionType.Html },
       function (asyncResult) {
         if (asyncResult.status === Office.AsyncResultStatus.Failed) {
@@ -113,50 +120,74 @@ async function inserirAssinatura(event) {
     );
   } catch (erro) {
     console.error("Falha ao processar assinatura:", erro);
-    event.completed();
+    if (event && typeof event.completed === "function") {
+      event.completed();
+    }
   }
 }
 
 async function obterDadosUsuario() {
-  const CHAVE_CACHE = "assinatura_gep_perfil_v3";
+  const CHAVE_CACHE = "assinatura_gep_perfil_v4";
   const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
-    const cacheSalvo = localStorage.getItem(CHAVE_CACHE);
-    if (cacheSalvo) {
-      const dadosCache = JSON.parse(cacheSalvo);
-      if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO_MS) {
-        return dadosCache.perfil;
+    if (cacheMemoria && Date.now() - cacheMemoria.timestamp < TEMPO_EXPIRACAO_MS) {
+      return cacheMemoria.perfil;
+    }
+
+    if (typeof localStorage !== "undefined") {
+      const cacheSalvo = localStorage.getItem(CHAVE_CACHE);
+      if (cacheSalvo) {
+        const dadosCache = JSON.parse(cacheSalvo);
+        if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO_MS) {
+          cacheMemoria = dadosCache;
+          return dadosCache.perfil;
+        }
       }
     }
 
-    await msalInstance.initialize();
+    let accessToken = null;
 
-    const emailLogado = Office.context.mailbox.userProfile.emailAddress;
-    const tokenRequest = {
-      scopes: ["User.Read"],
-      loginHint: emailLogado
-    };
+    if (msalInstance) {
+      await msalInstance.initialize();
 
-    let authResult;
-    const contas = msalInstance.getAllAccounts();
-    if (contas.length > 0) {
-      authResult = await msalInstance.acquireTokenSilent({
-        ...tokenRequest,
-        account: contas[0]
-      });
-    } else {
-      try {
-        authResult = await msalInstance.ssoSilent(tokenRequest);
-      } catch (erroSilencioso) {
-        authResult = await msalInstance.acquireTokenPopup(tokenRequest);
+      const emailLogado = Office.context.mailbox.userProfile.emailAddress;
+      const tokenRequest = {
+        scopes: ["User.Read"],
+        loginHint: emailLogado
+      };
+
+      let authResult;
+      const contas = msalInstance.getAllAccounts();
+      if (contas.length > 0) {
+        authResult = await msalInstance.acquireTokenSilent({
+          ...tokenRequest,
+          account: contas[0]
+        });
+      } else {
+        try {
+          authResult = await msalInstance.ssoSilent(tokenRequest);
+        } catch (erroSilencioso) {
+          authResult = await msalInstance.acquireTokenPopup(tokenRequest);
+        }
       }
+      accessToken = authResult.accessToken;
+    } else if (Office.auth && typeof Office.auth.getAccessToken === "function") {
+      accessToken = await Office.auth.getAccessToken({
+        allowSignInPrompt: true,
+        allowConsentPrompt: true,
+        forMSGraphAccess: true
+      });
+    }
+
+    if (!accessToken) {
+      throw new Error("Sem token de acesso disponível");
     }
 
     const campos = "displayName,jobTitle,businessPhones,mobilePhone,mail,userPrincipalName,streetAddress";
     const resposta = await fetch(`https://graph.microsoft.com/v1.0/me?$select=${campos}`, {
       headers: {
-        Authorization: `Bearer ${authResult.accessToken}`
+        Authorization: `Bearer ${accessToken}`
       }
     });
 
@@ -165,14 +196,15 @@ async function obterDadosUsuario() {
     }
 
     const perfil = await resposta.json();
+    const objetoCache = {
+      timestamp: Date.now(),
+      perfil: perfil
+    };
 
-    localStorage.setItem(
-      CHAVE_CACHE,
-      JSON.stringify({
-        timestamp: Date.now(),
-        perfil: perfil
-      })
-    );
+    cacheMemoria = objetoCache;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(CHAVE_CACHE, JSON.stringify(objetoCache));
+    }
 
     return perfil;
   } catch (erro) {
