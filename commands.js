@@ -1,5 +1,3 @@
-Office.onReady(() => {});
-
 const msalConfig = {
   auth: {
     clientId: "c4232071-8cb2-4038-a318-8b82a1118dd5",
@@ -106,20 +104,36 @@ async function inserirAssinatura(event) {
 </table>
 `;
 
-    const corpoComAssinatura = `<br><br>${assinaturaHTML}`;
+    const corpo = Office.context.mailbox.item.body;
 
-    Office.context.mailbox.item.body.setAsync(
-      corpoComAssinatura,
-      { coercionType: Office.CoercionType.Html },
-      function (asyncResult) {
-        if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-          console.error("Erro ao inserir assinatura: " + asyncResult.error.message);
+    if (typeof corpo.setSignatureAsync === "function") {
+      corpo.setSignatureAsync(
+        assinaturaHTML,
+        { coercionType: Office.CoercionType.Html },
+        function (asyncResult) {
+          if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+            corpo.setAsync(
+              `<br><br>${assinaturaHTML}`,
+              { coercionType: Office.CoercionType.Html },
+              function () {
+                if (event && typeof event.completed === "function") event.completed();
+              }
+            );
+          } else {
+            if (event && typeof event.completed === "function") event.completed();
+          }
         }
-        event.completed();
-      }
-    );
+      );
+    } else {
+      corpo.setAsync(
+        `<br><br>${assinaturaHTML}`,
+        { coercionType: Office.CoercionType.Html },
+        function () {
+          if (event && typeof event.completed === "function") event.completed();
+        }
+      );
+    }
   } catch (erro) {
-    console.error("Falha ao processar assinatura:", erro);
     if (event && typeof event.completed === "function") {
       event.completed();
     }
@@ -127,7 +141,7 @@ async function inserirAssinatura(event) {
 }
 
 async function obterDadosUsuario() {
-  const CHAVE_CACHE = "assinatura_gep_perfil_v4";
+  const CHAVE_CACHE = "assinatura_gep_perfil_v5";
   const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
@@ -172,7 +186,7 @@ async function obterDadosUsuario() {
         }
       }
       accessToken = authResult.accessToken;
-    } else if (Office.auth && typeof Office.auth.getAccessToken === "function") {
+    } else if (typeof Office !== "undefined" && Office.auth && typeof Office.auth.getAccessToken === "function") {
       accessToken = await Office.auth.getAccessToken({
         allowSignInPrompt: true,
         allowConsentPrompt: true,
@@ -181,7 +195,7 @@ async function obterDadosUsuario() {
     }
 
     if (!accessToken) {
-      throw new Error("Sem token de acesso disponível");
+      throw new Error("Sem token de acesso");
     }
 
     const campos = "displayName,jobTitle,businessPhones,mobilePhone,mail,userPrincipalName,streetAddress";
@@ -192,7 +206,7 @@ async function obterDadosUsuario() {
     });
 
     if (!resposta.ok) {
-      throw new Error(`Erro HTTP Graph: ${resposta.status}`);
+      throw new Error(`HTTP ${resposta.status}`);
     }
 
     const perfil = await resposta.json();
@@ -208,7 +222,6 @@ async function obterDadosUsuario() {
 
     return perfil;
   } catch (erro) {
-    console.warn("Fallback local ativado:", erro);
     const perfilOutlook = Office.context.mailbox.userProfile;
     return {
       displayName: perfilOutlook.displayName || "",
@@ -221,4 +234,10 @@ async function obterDadosUsuario() {
   }
 }
 
-Office.actions.associate("inserirAssinatura", inserirAssinatura);
+if (typeof globalThis !== "undefined") {
+  globalThis.inserirAssinatura = inserirAssinatura;
+}
+
+if (typeof Office !== "undefined" && Office.actions && typeof Office.actions.associate === "function") {
+  Office.actions.associate("inserirAssinatura", inserirAssinatura);
+}
