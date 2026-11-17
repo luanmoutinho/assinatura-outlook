@@ -234,10 +234,20 @@ async function obterDadosUsuario() {
   }
 }
 
-if (typeof globalThis !== "undefined") {
-  globalThis.inserirAssinatura = inserirAssinatura;
+async function onNewMessageComposeHandler(event) {
+  await inserirAssinatura(event);
 }
 
-if (typeof Office !== "undefined" && Office.actions && typeof Office.actions.associate === "function") {
-  Office.actions.associate("inserirAssinatura", inserirAssinatura);
+if (typeof globalThis !== "undefined") {
+  globalThis.inserirAssinatura = inserirAssinatura;
+  globalThis.onNewMessageComposeHandler = onNewMessageComposeHandler;
+}
+
+if (typeof Office !== "undefined") {
+  Office.onReady(function () {
+    if (Office.actions && typeof Office.actions.associate === "function") {
+      Office.actions.associate("inserirAssinatura", inserirAssinatura);
+      Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler);
+    }
+  });
 }
