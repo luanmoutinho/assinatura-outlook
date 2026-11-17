@@ -10,11 +10,19 @@ const msalConfig = {
 };
 
 let msalInstance = null;
-if (typeof msal !== "undefined") {
-  msalInstance = new msal.PublicClientApplication(msalConfig);
-}
-
 let cacheMemoria = null;
+
+function obterMsalInstance() {
+  if (msalInstance) return msalInstance;
+  try {
+    if (typeof msal !== "undefined" && typeof window !== "undefined") {
+      msalInstance = new msal.PublicClientApplication(msalConfig);
+    }
+  } catch (e) {
+    msalInstance = null;
+  }
+  return msalInstance;
+}
 
 function aguardar(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -109,7 +117,7 @@ async function inserirAssinatura(event, isAutomatico = false) {
 `;
 
     if (isAutomatico) {
-      await aguardar(350);
+      await aguardar(400);
     }
 
     const corpo = Office.context.mailbox.item.body;
@@ -149,7 +157,8 @@ async function inserirAssinatura(event, isAutomatico = false) {
 }
 
 async function obterDadosUsuario(isAutomatico = false) {
-  const CHAVE_CACHE = "assinatura_gep_perfil_v7";
+  const CHAVE_CACHE = "assinatura_gep_perfil_v8";
+  const CHAVE_BACKUP = "assinatura_gep_backup_v8";
   const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
@@ -161,7 +170,7 @@ async function obterDadosUsuario(isAutomatico = false) {
       const cacheSalvo = localStorage.getItem(CHAVE_CACHE);
       if (cacheSalvo) {
         const dadosCache = JSON.parse(cacheSalvo);
-        if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO_MS) {
+        if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO_MS && dadosCache.perfil && dadosCache.perfil.jobTitle) {
           cacheMemoria = dadosCache;
           return dadosCache.perfil;
         }
@@ -169,45 +178,61 @@ async function obterDadosUsuario(isAutomatico = false) {
     }
 
     let accessToken = null;
+    const emailLogado = Office.context.mailbox.userProfile.emailAddress;
+    const instanciaMsal = obterMsalInstance();
 
-    if (msalInstance) {
-      await msalInstance.initialize();
+    if (instanciaMsal) {
+      await instanciaMsal.initialize();
 
-      const emailLogado = Office.context.mailbox.userProfile.emailAddress;
       const tokenRequest = {
         scopes: ["User.Read"],
         loginHint: emailLogado
       };
 
-      let authResult;
-      const contas = msalInstance.getAllAccounts();
-      if (contas.length > 0) {
-        authResult = await msalInstance.acquireTokenSilent({
-          ...tokenRequest,
-          account: contas[0]
-        });
-      } else {
+      let authResult = null;
+      const contas = instanciaMsal.getAllAccounts();
+      const contaAlvo = contas.find(c => c.username && c.username.toLowerCase() === emailLogado.toLowerCase()) || contas[0];
+
+      if (contaAlvo) {
         try {
-          authResult = await msalInstance.ssoSilent(tokenRequest);
+          authResult = await instanciaMsal.acquireTokenSilent({
+            ...tokenRequest,
+            account: contaAlvo
+          });
+        } catch (e) {
+          authResult = null;
+        }
+      }
+
+      if (!authResult) {
+        try {
+          authResult = await instanciaMsal.ssoSilent(tokenRequest);
         } catch (erroSilencioso) {
           if (!isAutomatico) {
-            authResult = await msalInstance.acquireTokenPopup(tokenRequest);
-          } else {
-            throw erroSilencioso;
+            authResult = await instanciaMsal.acquireTokenPopup(tokenRequest);
           }
         }
       }
-      accessToken = authResult.accessToken;
-    } else if (typeof Office !== "undefined" && Office.auth && typeof Office.auth.getAccessToken === "function") {
-      accessToken = await Office.auth.getAccessToken({
-        allowSignInPrompt: !isAutomatico,
-        allowConsentPrompt: !isAutomatico,
-        forMSGraphAccess: true
-      });
+
+      if (authResult && authResult.accessToken) {
+        accessToken = authResult.accessToken;
+      }
+    }
+
+    if (!accessToken && typeof Office !== "undefined" && Office.auth && typeof Office.auth.getAccessToken === "function") {
+      try {
+        accessToken = await Office.auth.getAccessToken({
+          allowSignInPrompt: !isAutomatico,
+          allowConsentPrompt: !isAutomatico,
+          forMSGraphAccess: true
+        });
+      } catch (e) {
+        accessToken = null;
+      }
     }
 
     if (!accessToken) {
-      throw new Error("Sem token de acesso");
+      throw new Error("Token indisponível");
     }
 
     const campos = "displayName,jobTitle,businessPhones,mobilePhone,mail,userPrincipalName,streetAddress";
@@ -218,7 +243,7 @@ async function obterDadosUsuario(isAutomatico = false) {
     });
 
     if (!resposta.ok) {
-      throw new Error(`HTTP ${resposta.status}`);
+      throw new Error(`Graph HTTP ${resposta.status}`);
     }
 
     const perfil = await resposta.json();
@@ -230,10 +255,18 @@ async function obterDadosUsuario(isAutomatico = false) {
     cacheMemoria = objetoCache;
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(CHAVE_CACHE, JSON.stringify(objetoCache));
+      localStorage.setItem(CHAVE_BACKUP, JSON.stringify(perfil));
     }
 
     return perfil;
   } catch (erro) {
+    if (typeof localStorage !== "undefined") {
+      const backupSalvo = localStorage.getItem(CHAVE_BACKUP);
+      if (backupSalvo) {
+        return JSON.parse(backupSalvo);
+      }
+    }
+
     const perfilOutlook = Office.context.mailbox.userProfile;
     return {
       displayName: perfilOutlook.displayName || "",
