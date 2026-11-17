@@ -16,9 +16,13 @@ if (typeof msal !== "undefined") {
 
 let cacheMemoria = null;
 
-async function inserirAssinatura(event) {
+function aguardar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function inserirAssinatura(event, isAutomatico = false) {
   try {
-    const usuario = await obterDadosUsuario();
+    const usuario = await obterDadosUsuario(isAutomatico);
 
     const nome = (usuario.displayName || "").toLocaleUpperCase("pt-BR");
     const cargo = usuario.jobTitle || "";
@@ -104,6 +108,10 @@ async function inserirAssinatura(event) {
 </table>
 `;
 
+    if (isAutomatico) {
+      await aguardar(350);
+    }
+
     const corpo = Office.context.mailbox.item.body;
 
     if (typeof corpo.setSignatureAsync === "function") {
@@ -140,8 +148,8 @@ async function inserirAssinatura(event) {
   }
 }
 
-async function obterDadosUsuario() {
-  const CHAVE_CACHE = "assinatura_gep_perfil_v5";
+async function obterDadosUsuario(isAutomatico = false) {
+  const CHAVE_CACHE = "assinatura_gep_perfil_v6";
   const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
@@ -182,14 +190,18 @@ async function obterDadosUsuario() {
         try {
           authResult = await msalInstance.ssoSilent(tokenRequest);
         } catch (erroSilencioso) {
-          authResult = await msalInstance.acquireTokenPopup(tokenRequest);
+          if (!isAutomatico) {
+            authResult = await msalInstance.acquireTokenPopup(tokenRequest);
+          } else {
+            throw erroSilencioso;
+          }
         }
       }
       accessToken = authResult.accessToken;
     } else if (typeof Office !== "undefined" && Office.auth && typeof Office.auth.getAccessToken === "function") {
       accessToken = await Office.auth.getAccessToken({
-        allowSignInPrompt: true,
-        allowConsentPrompt: true,
+        allowSignInPrompt: !isAutomatico,
+        allowConsentPrompt: !isAutomatico,
         forMSGraphAccess: true
       });
     }
@@ -235,12 +247,17 @@ async function obterDadosUsuario() {
 }
 
 async function onNewMessageComposeHandler(event) {
-  await inserirAssinatura(event);
+  await inserirAssinatura(event, true);
 }
 
 if (typeof globalThis !== "undefined") {
   globalThis.inserirAssinatura = inserirAssinatura;
   globalThis.onNewMessageComposeHandler = onNewMessageComposeHandler;
+}
+
+if (typeof Office !== "undefined" && Office.actions && typeof Office.actions.associate === "function") {
+  Office.actions.associate("inserirAssinatura", inserirAssinatura);
+  Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler);
 }
 
 if (typeof Office !== "undefined") {
