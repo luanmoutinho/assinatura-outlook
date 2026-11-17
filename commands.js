@@ -1,6 +1,6 @@
 const msalConfig = {
   auth: {
-    clientId: "5af0fea8-9cb7-45cb-bd7f-0dc06725169b",
+    clientId: "31f4d827-b982-4c84-97f6-16bb08d2c1c1",
     authority: "https://login.microsoftonline.com/engenhariaep.com.br",
     redirectUri: "https://luanmoutinho.github.io/assinatura-outlook/commands.html"
   },
