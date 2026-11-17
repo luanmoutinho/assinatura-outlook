@@ -39,19 +39,40 @@ async function inserirAssinatura(event, isAutomatico = false) {
     const endereco = usuario.streetAddress || "";
 
     const linhaCargo = cargo
-      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:14px;font-weight:900;color:#706e6e;">${cargo}</td></tr>`
+      ? `<tr><td colspan="2" style="padding-top:4px;font-family:Arial,sans-serif;font-size:14px;font-weight:900;color:#706e6e;">${cargo}</td></tr>`
       : "";
 
     const linhaTelefone = telefone
-      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-telefone.png" width="14" style="vertical-align:middle;" alt=""><span style="color:#706e6e;margin-left:5px;">${telefone}</span></td></tr>`
+      ? `<tr>
+          <td width="16" valign="middle" style="padding-top:5px;width:16px;text-align:center;">
+            <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-telefone.png" width="14" style="display:block;border:0;margin:0 auto;" alt="">
+          </td>
+          <td valign="middle" style="padding-top:5px;padding-left:6px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;line-height:1.2;">
+            ${telefone}
+          </td>
+        </tr>`
       : "";
 
     const linhaEmail = email
-      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-email.png" width="14" style="vertical-align:middle;" alt=""><a href="mailto:${email}" style="color:#706e6e;text-decoration:none;margin-left:5px;">${email}</a></td></tr>`
+      ? `<tr>
+          <td width="16" valign="middle" style="padding-top:5px;width:16px;text-align:center;">
+            <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-email.png" width="14" style="display:block;border:0;margin:0 auto;" alt="">
+          </td>
+          <td valign="middle" style="padding-top:5px;padding-left:6px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;line-height:1.2;">
+            <a href="mailto:${email}" style="color:#706e6e;text-decoration:none;">${email}</a>
+          </td>
+        </tr>`
       : "";
 
     const linhaEndereco = endereco
-      ? `<tr><td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;"><img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-local.png" width="14" style="vertical-align:middle;" alt=""><span style="color:#706e6e;margin-left:5px;">${endereco}</span></td></tr>`
+      ? `<tr>
+          <td width="16" valign="middle" style="padding-top:5px;width:16px;text-align:center;">
+            <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-local.png" width="14" style="display:block;border:0;margin:0 auto;" alt="">
+          </td>
+          <td valign="middle" style="padding-top:5px;padding-left:6px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;line-height:1.2;">
+            ${endereco}
+          </td>
+        </tr>`
       : "";
 
     const assinaturaHTML = `
@@ -81,9 +102,9 @@ async function inserirAssinatura(event, isAutomatico = false) {
             </table>
           </td>
           <td valign="top" style="padding:15px 0 0 15px;">
-            <table>
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
               <tr>
-                <td style="font-family:Arial,sans-serif;font-size:18px;font-weight:900;color:#706e6e;text-transform:uppercase;line-height:1.2;">
+                <td colspan="2" style="font-family:Arial,sans-serif;font-size:18px;font-weight:900;color:#706e6e;text-transform:uppercase;line-height:1.2;">
                   ${nome}
                 </td>
               </tr>
@@ -92,9 +113,11 @@ async function inserirAssinatura(event, isAutomatico = false) {
               ${linhaEmail}
               ${linhaEndereco}
               <tr>
-                <td style="padding-top:4px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;">
-                  <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-link.png" width="14" style="vertical-align:middle;" alt="">
-                  <a href="https://grupoengenhariaep.com.br/" style="color:#706e6e;text-decoration:none;margin-left:5px;">grupoengenhariaep.com.br</a>
+                <td width="16" valign="middle" style="padding-top:5px;width:16px;text-align:center;">
+                  <img src="https://raw.githubusercontent.com/luanmoutinho/assinaturas-fotos/refs/heads/main/icone-link.png" width="14" style="display:block;border:0;margin:0 auto;" alt="">
+                </td>
+                <td valign="middle" style="padding-top:5px;padding-left:6px;font-family:Arial,sans-serif;font-size:12px;color:#706e6e;line-height:1.2;">
+                  <a href="https://grupoengenhariaep.com.br/" style="color:#706e6e;text-decoration:none;">grupoengenhariaep.com.br</a>
                 </td>
               </tr>
             </table>
