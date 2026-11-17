@@ -20,7 +20,7 @@ async function inserirAssinatura(event) {
   try {
     const usuario = await obterDadosUsuario();
 
-    const nome = usuario.displayName || "";
+    const nome = (usuario.displayName || "").toLocaleUpperCase(pt-BR);
     const cargo = usuario.jobTitle || "";
     const telefone = (usuario.businessPhones && usuario.businessPhones[0]) || usuario.mobilePhone || "";
     const email = usuario.mail || usuario.userPrincipalName || "";
