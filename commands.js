@@ -1,6 +1,6 @@
 const msalConfig = {
   auth: {
-    clientId: "c4232071-8cb2-4038-a318-8b82a1118dd5",
+    clientId: "5af0fea8-9cb7-45cb-bd7f-0dc06725169b",
     authority: "https://login.microsoftonline.com/engenhariaep.com.br",
     redirectUri: "https://luanmoutinho.github.io/assinatura-outlook/commands.html"
   },
@@ -149,7 +149,7 @@ async function inserirAssinatura(event, isAutomatico = false) {
 }
 
 async function obterDadosUsuario(isAutomatico = false) {
-  const CHAVE_CACHE = "assinatura_gep_perfil_v6";
+  const CHAVE_CACHE = "assinatura_gep_perfil_v7";
   const TEMPO_EXPIRACAO_MS = 4 * 60 * 60 * 1000;
 
   try {
